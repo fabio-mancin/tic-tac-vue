@@ -98,14 +98,17 @@
       // extremely basic AI
       aiTurn: function () {
         const currentSign = this.currentSign
+        const otherSign = currentSign === 'X' ? 'O' : 'X'
         const winConditions = this.winConditions
         const gridBoxes = this.gridBoxes
+        let usedStrategy = false
 
-        // if the AI can win in its current turn, it will
-        // hack-ish way to break out of the method, but I don't like classic for loops
+        // the AI doesn't think ahead: it will only use a "strategy" in case it can make something happen in that turn
+        // it will prioritize winning, then it will try to prevent the player from winning
         winConditions.every(e => {
           const currentCheckedLine = [gridBoxes[e[0]].sign, gridBoxes[e[1]].sign, gridBoxes[e[2]].sign]
           const canWin = (currentCheckedLine.filter(x => x === currentSign).length === 2) && (currentCheckedLine.filter(x => x === '').length === 1)
+          const preventLose = (currentCheckedLine.filter(x => x === otherSign).length === 2) && (currentCheckedLine.filter(x => x === '').length === 1)
           if (canWin) {
             e.forEach(p => { if (gridBoxes[p].sign === '') gridBoxes[p].sign = currentSign })
             this.message = `${this.currentSign} won. Click on a tile to start another match.`
@@ -113,14 +116,23 @@
             this.resetGrid()
             return false
           }
+          if (preventLose) {
+            e.forEach(p => { if (gridBoxes[p].sign === '') gridBoxes[p].sign = currentSign })
+            this.changeSign()
+            usedStrategy = !usedStrategy
+            // hack-ish way to break out of the method, but I don't like classic for loops
+            return false
+          }
           return true
         })
 
         // otherwise it will just choose a random empty tile
-        const emptyTiles = gridBoxes.filter(e => e.sign === '').map(e => e.id)
-        const randomEmptyTileId = emptyTiles[Math.floor(Math.random() * emptyTiles.length)]
-        gridBoxes[randomEmptyTileId].sign = currentSign
-        this.changeSign()
+        if (!usedStrategy) {
+          const emptyTiles = gridBoxes.filter(e => e.sign === '').map(e => e.id)
+          const randomEmptyTileId = emptyTiles[Math.floor(Math.random() * emptyTiles.length)]
+          gridBoxes[randomEmptyTileId].sign = currentSign
+          this.changeSign()
+        }
       },
 
       changeSign: function () {
