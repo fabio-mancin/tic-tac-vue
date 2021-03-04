@@ -16,7 +16,7 @@
   <p align="center">
     <br />
     <br />
-    <a href="https://github.com/fabio-mancin/tic-tac-vue">View Demo</a>
+    <a href="https://fabio-mancin-tic-tac-vue.netlify.app/">View Demo</a>
     ·
     <a href="https://github.com/fabio-mancin/tic-tac-vue/issues">Report Bug</a>
     ·
@@ -62,7 +62,7 @@ Tic Tac Toe game made to practice VueJS.
 
 ## Getting Started
 
-To get a local copy up and running follow these simple steps.
+To get a local copy up and running follow these simple steps. You can also try a live demo [on Netlify](https://fabio-mancin-tic-tac-vue.netlify.app/)
 
 ### Prerequisites
 
@@ -108,6 +108,7 @@ Website: [fabiomancin.org](https://fabiomancin.org)
 ## Acknowledgements
 
 * [start2impact](start2impact.it)
+* [netlify](https://www.netlify.com/)
 
 [contributors-shield]: https://img.shields.io/github/contributors/fabio-mancin/tic-tac-vue.svg?style=for-the-badge
 [contributors-url]: https://github.com/fabio-mancin/tic-tac-vue/graphs/contributors
