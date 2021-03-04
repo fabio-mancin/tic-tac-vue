@@ -4,7 +4,7 @@
 
 <script>
   export default {
-    name: 'Message',
+    name: 'GridMessage',
     props: ['message', 'currentSign']
   }
 

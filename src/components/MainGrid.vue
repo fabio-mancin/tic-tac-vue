@@ -1,19 +1,33 @@
 <template>
   <div>
-    <toggle-button @change="onChangeEventHandler" :labels="toggleLabels" :width="100" :height="30"
+    <toggle-button v-on:change="onChangeEventHandler"
+      :labels="toggleLabels"
+      :width="100" :height="30"
       :value="activateAI" />
-    <Message v-bind:message="message" v-bind:currentSign="currentSign" />
+
+    <replay-button v-if="gameOver" v-on:click.native="newGame"></replay-button>
+
+    <grid-message v-bind:message="message" v-bind:currentSign="currentSign" />
+
     <div class="grid" :style="{'width': `${gridSize}px`, 'height': `${gridSize}px`}">
-      <GridBox v-for="gridBox in gridBoxes" :key="gridBox.id" v-bind:sign="gridBox.sign"
-        v-bind:currentSign="currentSign" v-on:update-sign="updateSign" />
+
+      <grid-box v-for="gridBox in gridBoxes"
+        :key="gridBox.id"
+        v-bind:sign="gridBox.sign"
+        v-bind:currentSign="currentSign"
+        v-on:update-sign="updateSign"
+        :style="{'pointer-events': `${clickable}`}"/>
+
     </div>
   </div>
 </template>
 
 <script>
   import GridBox from './GridBox.vue'
-  import Message from './Message.vue'
+  import GridMessage from './GridMessage.vue'
+  import ReplayButton from './ReplayButton.vue'
   import { ToggleButton } from 'vue-js-toggle-button'
+  import { helpers } from '@/helpers.js'
 
   export default {
     name: 'MainGrid',
@@ -21,10 +35,9 @@
       return {
         gridSize: 300,
         activateAI: true,
-        toggleLabels: {
-          checked: 'AI On',
-          unchecked: 'AI Off'
-        },
+        gameOver: false,
+        clickable: 'auto',
+        toggleLabels: { checked: 'AI On', unchecked: 'AI Off' },
         message: 'Start playing by clicking on a tile.',
         currentSign: 'X',
         gridBoxes: [
@@ -37,20 +50,11 @@
           { id: 6, sign: '' },
           { id: 7, sign: '' },
           { id: 8, sign: '' }
-        ],
-        winConditions: [
-          [0, 1, 2],
-          [3, 4, 5],
-          [6, 7, 8],
-          [0, 3, 6],
-          [1, 4, 7],
-          [2, 5, 8],
-          [0, 4, 8],
-          [2, 4, 6]
         ]
       }
     },
-    // apparently CSS absolutely hates squares, so I got annoyed and forced square responsivity on component creation
+    // apparently CSS absolutely hates aspect ratios, forcing people to hack stuff with paddings or use experimental rules
+    // so I got annoyed and forced square responsivity on component creation
     created: function () {
       const windowWidth = window.innerWidth
       const windowHeight = window.innerHeight
@@ -58,11 +62,31 @@
     },
 
     methods: {
-      // when a game ends all tiles get reset
-      resetGrid: function () {
+      // when a game gets restarted all tiles get reset and the grid is made clickable again
+      newGame: function () {
+        this.currentSign = 'X'
         this.gridBoxes.forEach(e => {
           e.sign = ''
         })
+        this.gameOver = false
+        this.clickable = 'auto'
+      },
+
+      isGameOver: function () {
+        // checking the board for victory or draw conditions
+        const isWonOrDraw = helpers.checkVictory(this.gridBoxes)
+
+        // checking if the game is over and updating the message accordingly
+        if (isWonOrDraw.isWon) {
+          this.message = `${this.currentSign} won. Click the button above to start another match.`
+          this.gameOver = true
+          // not letting the user click on a tile if the game is over
+          this.clickable = 'none'
+        } else if (isWonOrDraw.isDraw) {
+          this.message = 'It\'s a draw. Click the button above to start another match.'
+          this.gameOver = true
+          this.clickable = 'none'
+        }
       },
 
       // component sends a signal when it gets clicked and this function executes
@@ -70,21 +94,13 @@
         // updating data for the GridBox that emitted the signal
         this.gridBoxes[targetNode].sign = this.currentSign
         this.message = ''
-        const winConditions = this.winConditions
-        // quick and ugly win or draw check
-        const isWon = winConditions.map(e => e.map(e => this.gridBoxes[e].sign)).filter(e => e.every(e => e === this
-          .gridBoxes[targetNode].sign)).length > 0
-        const isDraw = !isWon && this.gridBoxes.every(e => e.sign !== '')
-        // checking if the game is over and updating the message accordingly
-        if (isWon) {
-          this.message = `${this.currentSign} won. Click on a tile to start another match.`
-          this.resetGrid()
-        } else if (isDraw) {
-          this.message = 'It\'s a draw. Click on a tile to start another match.'
-          this.resetGrid()
-        }
+
+        // checking if the player won with his move
+        this.isGameOver()
+
+        // if he didn't and the game is in single player mode, the AI will play its turn
         this.changeSign()
-        if (this.activateAI) {
+        if (this.activateAI && !this.gameOver) {
           this.aiTurn()
         }
       },
@@ -92,42 +108,28 @@
       // activating the AI and resetting the grid
       onChangeEventHandler: function () {
         this.activateAI = !this.activateAI
-        this.resetGrid()
+        this.newGame()
       },
 
       // extremely basic AI
       aiTurn: function () {
         const currentSign = this.currentSign
-        const otherSign = currentSign === 'X' ? 'O' : 'X'
-        const winConditions = this.winConditions
         const gridBoxes = this.gridBoxes
-        let usedStrategy = false
+        const aiTurnResult = helpers.playAiTurn(this.currentSign, this.gridBoxes)
 
-        // the AI doesn't think ahead: it will only use a "strategy" in case it can make something happen in that turn
-        // it will prioritize winning, then it will try to prevent the player from winning
-        winConditions.every(e => {
-          const currentCheckedLine = [gridBoxes[e[0]].sign, gridBoxes[e[1]].sign, gridBoxes[e[2]].sign]
-          const canWin = (currentCheckedLine.filter(x => x === currentSign).length === 2) && (currentCheckedLine.filter(x => x === '').length === 1)
-          const preventLose = (currentCheckedLine.filter(x => x === otherSign).length === 2) && (currentCheckedLine.filter(x => x === '').length === 1)
-          if (canWin) {
-            e.forEach(p => { if (gridBoxes[p].sign === '') gridBoxes[p].sign = currentSign })
-            this.message = `${this.currentSign} won. Click on a tile to start another match.`
-            this.changeSign()
-            this.resetGrid()
-            return false
+        if (aiTurnResult.canWin) {
+            aiTurnResult.parsedLine.forEach(p => { if (gridBoxes[p].sign === '') gridBoxes[p].sign = currentSign })
+            this.message = `${this.currentSign} won. Click the button above to start another match.`
+            this.gameOver = true
+            this.clickable = 'none'
           }
-          if (preventLose) {
-            e.forEach(p => { if (gridBoxes[p].sign === '') gridBoxes[p].sign = currentSign })
+        if (aiTurnResult.preventedLose) {
+            aiTurnResult.parsedLine.forEach(p => { if (gridBoxes[p].sign === '') gridBoxes[p].sign = currentSign })
             this.changeSign()
-            usedStrategy = !usedStrategy
-            // hack-ish way to break out of the method, but I don't like classic for loops
-            return false
-          }
-          return true
-        })
+        }
 
-        // otherwise it will just choose a random empty tile
-        if (!usedStrategy) {
+        // if the AI can't win and the player won't win in this turn, it will just choose a random empty tile
+        if (!aiTurnResult.canWin && !aiTurnResult.preventedLose) {
           const emptyTiles = gridBoxes.filter(e => e.sign === '').map(e => e.id)
           const randomEmptyTileId = emptyTiles[Math.floor(Math.random() * emptyTiles.length)]
           gridBoxes[randomEmptyTileId].sign = currentSign
@@ -141,8 +143,9 @@
     },
     components: {
       GridBox,
-      Message,
-      ToggleButton
+      GridMessage,
+      ToggleButton,
+      ReplayButton
     }
   }
 
